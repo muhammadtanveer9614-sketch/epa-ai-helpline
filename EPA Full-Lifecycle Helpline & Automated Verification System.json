@@ -1,0 +1,1263 @@
+{
+  "name": "EPA Full-Lifecycle Helpline & Automated Verification System",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "epa-inbound-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3715d3be-4e7f-49f5-86b2-ca4cc8d62225",
+      "name": "1. Inbound Call Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        -688
+      ],
+      "webhookId": "c09275f2-7394-44c0-af16-157674b2c514"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are NOT talking to citizen. You are a DATA PARSER for EPA Punjab.\n\nYour job is NOT to reply to citizen. Your job is to READ the transcript and return ONLY JSON.\n\nDO NOT say Assalam o Alaikum. DO NOT give advice. DO NOT be polite.\nONLY return JSON.\n\nReturn EXACTLY this format, no other text:\n{\n  \"intent\": \"NEW_COMPLAINT\",\n  \"complaint_id\": \"EPA-LHR-912\",\n  \"citizen_name\": \"Muhammad Ali\",\n  \"citizen_phone\": \"+923001234567\",\n  \"location\": \"DHA Phase 5, Lahore\",\n  \"complaint_type\": \"AIR_POLLUTION\",\n  \"complaint_text\": \"Factory se kala dhuaan aa raha hai\",\n  \"priority\": \"HIGH\",\n  \"district\": \"Lahore\",\n  \"summary_urdu\": \"DHA Phase 5 me factory se kala dhuaan\",\n  \"is_verified\": false,\n  \"next_action\": \"ROUTE_TO_DO\"\n}\n\nRules:\n- intent: NEW_COMPLAINT if new masla, STATUS_CHECK if \"meri complaint ka kya bana\", VERIFICATION_RESPONSE if \"han ho gaya / nahi hua\", GENERAL_QUERY if rule puch raha hai\n- complaint_type: AIR_POLLUTION / WATER_POLLUTION / NOISE_POLLUTION / SOLID_WASTE / INDUSTRIAL_VIOLATION / OTHER\n- priority: HIGH if hospital/school/bachay bimar/saans ka masla, else MEDIUM, else LOW\n- complaint_id: agar transcript me purana ID hai to wohi use karo, warna naya banao EPA-LHR- + 3 digit e.g. EPA-LHR-912\n- If name/phone/location transcript me nahi hai, to input ke baqi fields se le lo\n- Output me ```json ya koi extra lafz NAHI likhna, sirf pure JSON"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "text"
+            }
+          }
+        }
+      },
+      "id": "49d482a4-f5eb-432e-a84e-f062b043482f",
+      "name": "2. OpenAI Intent & Data Parser",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        -272,
+        -704
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "2iEuA8R8OK5hrw6M",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ $json.output[0].content[0].text }}",
+        "options": {}
+      },
+      "id": "da04dcb2-f232-41a1-a644-6564cf61c31b",
+      "name": "2b. Extract Parsed Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        112,
+        -720
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "complaint",
+                    "id": "035ad94e-e373-456f-88c8-bbcb27d0bb69"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "complaint"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "question",
+                    "id": "bef4de48-0020-4e16-9d38-2a46d609a01b"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "question"
+            }
+          ]
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "92913084-1c37-42a1-8291-c19f667b3747",
+      "name": "3. Switch: Intent Classifier",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        320,
+        -752
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1_g7DuSFxdl-Vl4_b6LIgnKW_hKBFAru0uqZ5orYbwxc/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "caller name",
+              "displayName": "caller name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller phone",
+              "displayName": "caller phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint details",
+              "displayName": "complaint details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint_id",
+              "displayName": "complaint_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller_phone",
+              "displayName": "caller_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_action",
+              "displayName": "do_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_name",
+              "displayName": "do_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "citizen feedback",
+              "displayName": "citizen feedback",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "citizen_name",
+              "displayName": "citizen_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "citizen_phone",
+              "displayName": "citizen_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint_type",
+              "displayName": "complaint_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint_text",
+              "displayName": "complaint_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "district",
+              "displayName": "district",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "summary_urdu",
+              "displayName": "summary_urdu",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_verified",
+              "displayName": "is_verified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "next_action",
+              "displayName": "next_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "72ff6773-89ad-4373-898f-66bad9990fe3",
+      "name": "5. Log Complaint (Status: Pending)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        672,
+        -736
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "jVi6NPax856NoN5g",
+          "name": "Google Sheets account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "load",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "epa",
+          "mode": "list",
+          "cachedResultName": "epa"
+        },
+        "prompt": "={{ $json.complaint_question }}",
+        "options": {}
+      },
+      "id": "81bf0818-f68e-457d-bbe7-82b88148a5a9",
+      "name": "4. Pinecone Vector DB (RAG Info Query)",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -1040
+      ],
+      "credentials": {
+        "pineconeApi": {
+          "id": "wcLRwYqaQ0rN00Nc",
+          "name": "Pinecone account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "do-response-submit",
+        "options": {}
+      },
+      "id": "bf95b86e-aa7f-4191-9450-6846cd21c2ca",
+      "name": "7. Webhook: DO Action Submitted",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -432
+      ],
+      "webhookId": "4e0a951d-147c-4289-ba7c-b4471b920a5a"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1_g7DuSFxdl-Vl4_b6LIgnKW_hKBFAru0uqZ5orYbwxc/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "caller name",
+              "displayName": "caller name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller phone",
+              "displayName": "caller phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint details",
+              "displayName": "complaint details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint_id",
+              "displayName": "complaint_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller_phone",
+              "displayName": "caller_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_action",
+              "displayName": "do_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_name",
+              "displayName": "do_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "citizen feedback",
+              "displayName": "citizen feedback",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "12d81ea9-9297-4c4c-ad5c-53666bc1b049",
+      "name": "8. Update Sheet (Status: In Verification)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        48,
+        -416
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0sd77iete7ceIAWo",
+          "name": "Google Sheets account 6"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "citizen-feedback-webhook",
+        "options": {}
+      },
+      "id": "103bd152-6447-456b-99e3-8828ef68dd0a",
+      "name": "10. Webhook: Callback Result Received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        -128
+      ],
+      "webhookId": "57ad3de3-0152-418f-be8e-cd4d509418fd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body.citizen_satisfied }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "26e16ab3-ba67-4871-86a5-4ef4d02b32a1",
+      "name": "11. IF Citizen Satisfied?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1_g7DuSFxdl-Vl4_b6LIgnKW_hKBFAru0uqZ5orYbwxc/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "citizen feedback"
+          ],
+          "schema": [
+            {
+              "id": "caller name",
+              "displayName": "caller name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller phone",
+              "displayName": "caller phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint details",
+              "displayName": "complaint details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint_id",
+              "displayName": "complaint_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller_phone",
+              "displayName": "caller_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_action",
+              "displayName": "do_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_name",
+              "displayName": "do_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "citizen feedback",
+              "displayName": "citizen feedback",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "98aad6f8-bc75-4bf4-ba3b-602b9a8a6e44",
+      "name": "12. Update Sheet (Status: RESOLVED)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        16,
+        -112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "G7YmqViQAEzcRz94",
+          "name": "Google Sheets account 7"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1_g7DuSFxdl-Vl4_b6LIgnKW_hKBFAru0uqZ5orYbwxc/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "citizen feedback"
+          ],
+          "schema": [
+            {
+              "id": "caller name",
+              "displayName": "caller name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller phone",
+              "displayName": "caller phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint details",
+              "displayName": "complaint details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "complaint_id",
+              "displayName": "complaint_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caller_phone",
+              "displayName": "caller_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_action",
+              "displayName": "do_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "do_name",
+              "displayName": "do_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "citizen feedback",
+              "displayName": "citizen feedback",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "0871a93d-2084-4ca5-b9a0-84ef55a0d511",
+      "name": "13. Update Sheet (Status: RE-OPENED)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        16,
+        144
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "G7YmqViQAEzcRz94",
+          "name": "Google Sheets account 7"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "tani1501345@gmail.com",
+        "subject": "=New EPA Complaint: {{ $json.caller_address }}",
+        "message": "=a new complint has been received in your district\n\ncomplaint details:https://docs.google.com/spreadsheets/d/1_g7DuSFxdl-Vl4_b6LIgnKW_hKBFAru0uqZ5orYbwxc/edit?usp=sharing\n\nkindly check take action and resolve it as soon as possible",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        -688
+      ],
+      "id": "ec20f85e-e5bf-4245-98a5-2464fe3b0e37",
+      "name": "Send a message",
+      "webhookId": "3a7fc7dd-7075-4a80-bd50-0ae727903cdd",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "R9ui00UMg4ON9Ybk",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "muhammadtanveer9614@gmail.com",
+        "subject": "warning and resolved issue again",
+        "message": "citizen is not satisfied kindly check issue again and resolved you are strictly advised to resolved issue check the remarks and resolve the issue https://docs.google.com/spreadsheets/d/1_g7DuSFxdl-Vl4_b6LIgnKW_hKBFAru0uqZ5orYbwxc/edit?usp=sharing",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -32
+      ],
+      "id": "5330447c-ffdb-4454-af1a-15caa6abb34d",
+      "name": "Send a message1",
+      "webhookId": "5efc82d1-52d3-4eee-a184-5fd15142d5c0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "R9ui00UMg4ON9Ybk",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1008,
+        -832
+      ],
+      "id": "eed1c447-c280-4313-b3e0-19ba38a1cac3",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "3U0yACNnUKO2EVVT",
+          "name": "OpenAI account 4"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "10. Webhook: Callback Result Received": [
+      {
+        "json": {
+          "body": {
+            "citizen_satisfied": true,
+            "complaint_id": "EPA-LHR-786",
+            "citizen_phone": "03001234567",
+            "citizen_name": "Ali Ahmed",
+            "feedback_text": "Ji kaam ho gaya hai"
+          }
+        }
+      },
+      {
+        "json": {
+          "body": {
+            "citizen_satisfied": false,
+            "complaint_id": "EPA-LHR-787",
+            "citizen_phone": "03007654321",
+            "citizen_name": "Usman Khan",
+            "feedback_text": "Nahi, masla waisa hi hai"
+          }
+        }
+      }
+    ],
+    "7. Webhook: DO Action Submitted": [
+      {
+        "json": {
+          "body": {
+            "complaint_id": "EPA-LHR-786",
+            "do_id": "DO-LHR-01",
+            "do_name": "Ahmed Raza - DO Lahore",
+            "action_taken": "Site visited, industrial waste removed and notice issued to factory.",
+            "action_date": "2026-11-04",
+            "status": "ACTION_COMPLETED",
+            "proof_url": "https://drive.google.com/file/d/proof123",
+            "remarks": "Factory has been warned"
+          }
+        }
+      }
+    ],
+    "1. Inbound Call Webhook": [
+      {
+        "json": {
+          "body": {
+            "call_id": "call_12345",
+            "citizen_name": "Muhammad Ali",
+            "citizen_phone": "+923001234567",
+            "citizen_cnic": "35202-1234567-1",
+            "location": "DHA Phase 5, Lahore",
+            "transcript": "Assalam o alaikum, main DHA Phase 5 Lahore se bol raha hun. Yahan paas wali factory se bohat zyada kala dhuaan aa raha hai, saans lena mushkil ho gaya hai, bachay bimar ho rahe hain. Please is pe action lein.",
+            "complaint_text": "Factory se kala dhuaan aa raha hai, DHA Phase 5 Lahore me air pollution ho raha hai",
+            "call_duration": "45 seconds"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "1. Inbound Call Webhook": {
+      "main": [
+        [
+          {
+            "node": "2. OpenAI Intent & Data Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. OpenAI Intent & Data Parser": {
+      "main": [
+        [
+          {
+            "node": "2b. Extract Parsed Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2b. Extract Parsed Fields": {
+      "main": [
+        [
+          {
+            "node": "3. Switch: Intent Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Switch: Intent Classifier": {
+      "main": [
+        [
+          {
+            "node": "5. Log Complaint (Status: Pending)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "5. Log Complaint (Status: Pending)": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Webhook: DO Action Submitted": {
+      "main": [
+        [
+          {
+            "node": "8. Update Sheet (Status: In Verification)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Update Sheet (Status: In Verification)": {
+      "main": [
+        []
+      ]
+    },
+    "10. Webhook: Callback Result Received": {
+      "main": [
+        [
+          {
+            "node": "11. IF Citizen Satisfied?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11. IF Citizen Satisfied?": {
+      "main": [
+        [
+          {
+            "node": "12. Update Sheet (Status: RESOLVED)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "13. Update Sheet (Status: RE-OPENED)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13. Update Sheet (Status: RE-OPENED)": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Pinecone Vector DB (RAG Info Query)": {
+      "main": [
+        []
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "4. Pinecone Vector DB (RAG Info Query)",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c989fd28-fb14-4e96-8658-a1b1bce2d680",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9156e0e1029b1bef6e1b0c2dea3a5b41b2a652b6093c91caf611a562e7d31609"
+  },
+  "nodeGroups": [],
+  "id": "8TZxH0aZBfvYDB4F",
+  "tags": []
+}
